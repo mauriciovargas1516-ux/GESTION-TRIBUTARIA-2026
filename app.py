@@ -9,9 +9,44 @@ import streamlit as st
 # ==============================================================================
 st.set_page_config(
     page_title="Gestión Tributaria para la Toma de Decisiones 2026 - ULagos",
-    page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="expanded",
+)
+
+# Estilo Corporativo Limpio (Conservando paleta de colores ejecutiva sin emojis)
+st.markdown(
+    """
+    <style>
+    .block-container {padding-top: 1.4rem !important;}
+    .corp-banner {
+        background: linear-gradient(90deg, #0F172A 0%, #1E3A8A 100%);
+        color: #FFFFFF;
+        padding: 18px 24px;
+        border-radius: 6px;
+        margin-bottom: 18px;
+        border-left: 5px solid #38BDF8;
+    }
+    .corp-title {font-size: 21px; font-weight: 700; margin: 0; letter-spacing: 0.3px;}
+    .corp-sub {font-size: 13px; color: #CBD5E1; margin-top: 4px;}
+    .sec-header {
+        background-color: #DBEAFE;
+        color: #1E3A8A;
+        padding: 8px 14px;
+        font-weight: 700;
+        font-size: 14px;
+        border-radius: 5px;
+        margin-top: 10px;
+        margin-bottom: 12px;
+        border-left: 4px solid #1D4ED8;
+    }
+    button[data-baseweb="tab"] {font-weight: 600 !important;}
+    </style>
+    <div class="corp-banner">
+        <div class="corp-title">SUITE DE GESTIÓN TRIBUTARIA PARA LA TOMA DE DECISIONES 2026</div>
+        <div class="corp-sub">Motor Normativo, Simulador de Impuestos (DL 825 / LIR) y Analítica de Cumplimiento PGCT 2026 | ULagos</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 # ==============================================================================
@@ -65,7 +100,7 @@ DERECHOS_CONTRIBUYENTE_8BIS = [
 # ==============================================================================
 # BARRA LATERAL Y NAVEGACIÓN
 # ==============================================================================
-st.sidebar.title("⚖️ Gestión Tributaria 2026")
+st.sidebar.title("Gestión Tributaria 2026")
 st.sidebar.markdown("**Universidad de Los Lagos**  \nIngeniería Comercial | Semestre X  \nDocente: Richard Arnoldo Villanueva Soto")
 st.sidebar.divider()
 
@@ -79,19 +114,16 @@ modulo_trib = st.sidebar.radio(
     ],
 )
 
-st.title("⚖️ Suite de Gestión Tributaria para la Toma de Decisiones 2026")
-st.caption("Motor Normativo, Simulador de Impuestos (DL 825 / LIR) y Analítica de Cumplimiento PGCT 2026 | ULagos")
-
 # ==============================================================================
 # MÓDULO 1: INSTITUCIONALIDAD, CICLO DE VIDA Y DERECHOS DEL CONTRIBUYENTE
 # ==============================================================================
 if modulo_trib.startswith("1."):
-    st.header("1. Educación Fiscal, Administración Tributaria y Ciclo de Vida del Contribuyente")
+    st.markdown("<div class='sec-header'>1. EDUCACIÓN FISCAL, ADMINISTRACIÓN TRIBUTARIA Y CICLO DE VIDA DEL CONTRIBUYENTE</div>", unsafe_allow_html=True)
 
     t1, t2, t3 = st.tabs([
-        "🏛️ Ecosistema Hacienda y Evolución SII",
-        "🔄 Las 5 Etapas del Ciclo de Vida",
-        "🛡️ Derechos (Art. 8 bis / ter / quáter) y Deberes",
+        "I. Ecosistema Hacienda y Evolución SII",
+        "II. Las 5 Etapas del Ciclo de Vida",
+        "III. Derechos (Art. 8 bis / ter / quáter) y Deberes",
     ])
 
     with t1:
@@ -116,13 +148,13 @@ if modulo_trib.startswith("1."):
         mes_evento = st.selectbox("Mes en que inició operaciones o cesó actividades:", meses_lista, index=9)
         idx_m = meses_lista.index(mes_evento)
         mes_limite = meses_lista[(idx_m + 2) % 12]
-        st.success(f"📌 Si el hecho ocurrió en **{mes_evento}**, el plazo legal vence el **último día hábil de {mes_limite}** (dentro de los 2 meses siguientes).")
+        st.success(f"Cálculo de plazo legal: Si el hecho ocurrió en **{mes_evento}**, el plazo legal vence el **último día hábil de {mes_limite}** (dentro de los 2 meses siguientes).")
 
     with t3:
         c_der, c_deb = st.columns([3, 2])
         with c_der:
             st.subheader("Catálogo de los 20 Derechos del Contribuyente (Art. 8 bis CT)")
-            busqueda_der = st.text_input("🔍 Filtrar derecho por palabra clave (ej. fiscalización, buena fe, devolución):", "")
+            busqueda_der = st.text_input("Filtrar derecho por palabra clave (ej. fiscalización, buena fe, devolución):", "")
             derechos_filtrados = [d for d in DERECHOS_CONTRIBUYENTE_8BIS if busqueda_der.lower() in d.lower()]
             for d in derechos_filtrados:
                 st.markdown(f"- {d}")
@@ -145,7 +177,7 @@ if modulo_trib.startswith("1."):
 # MÓDULO 2: CLASIFICADOR Y SIMULADOR DE RENTAS (1ª CATEGORÍA VS 2ª CATEGORÍA)
 # ==============================================================================
 elif modulo_trib.startswith("2."):
-    st.header("2. Clasificación Tributaria de las Rentas y Estructura Jurídica")
+    st.markdown("<div class='sec-header'>2. CLASIFICACIÓN TRIBUTARIA DE LAS RENTAS Y ESTRUCTURA JURÍDICA</div>", unsafe_allow_html=True)
 
     col_r1, col_r2 = st.columns(2)
     with col_r1:
@@ -204,12 +236,12 @@ elif modulo_trib.startswith("2."):
 # MÓDULO 3: SIMULADOR IVA, PROPORCIONALIDAD Y AUDITORÍA F29 (DL N° 825)
 # ==============================================================================
 elif modulo_trib.startswith("3."):
-    st.header("3. Impuesto al Valor Agregado (DL N° 825): Débito, Crédito, Proporcionalidad y F29")
+    st.markdown("<div class='sec-header'>3. IMPUESTO AL VALOR AGREGADO (DL N° 825): DÉBITO, CRÉDITO, PROPORCIONALIDAD Y F29</div>", unsafe_allow_html=True)
 
     iva_tab1, iva_tab2, iva_tab3 = st.tabs([
-        "🧮 Determinación Mensual IVA, Proporcionalidad y Remanente UTM",
-        "⚖️ Calificador de Hecho Gravado en Servicios (Ley N° 21.420)",
-        "🔍 Matriz de Auditoría Tributaria RCV - F29 y Checklist",
+        "I. Determinación Mensual IVA, Proporcionalidad y Remanente UTM",
+        "II. Calificador de Hecho Gravado en Servicios (Ley N° 21.420)",
+        "III. Matriz de Auditoría Tributaria RCV - F29 y Checklist",
     ])
 
     with iva_tab1:
@@ -249,15 +281,15 @@ elif modulo_trib.startswith("3."):
             st.metric("IVA Débito Fiscal del Mes", f"${debito_fiscal:,.0f} CLP")
             st.metric("IVA Crédito Fiscal Imputable", f"${credito_fiscal_total:,.0f} CLP", f"Proporcionalidad: {prop_afecta:.2f}%")
             if diferencia_iva > 0:
-                st.error(f"💰 **IVA Determinado a Pagar en F29:** ${diferencia_iva:,.0f} CLP")
+                st.error(f"**IVA Determinado a Pagar en F29:** ${diferencia_iva:,.0f} CLP")
             else:
                 remanente_pesos = abs(diferencia_iva)
                 remanente_utm_nuevo = remanente_pesos / valor_utm
-                st.success(f"📈 **Remanente de Crédito Fiscal:** ${remanente_pesos:,.0f} CLP ({remanente_utm_nuevo:.2f} UTM)")
+                st.success(f"**Remanente de Crédito Fiscal:** ${remanente_pesos:,.0f} CLP ({remanente_utm_nuevo:.2f} UTM)")
             st.caption(f"IVA de compras que pasa a costo/gasto por proporcionalidad o giro exento: **${iva_no_recuperable:,.0f} CLP**.")
 
         st.divider()
-        st.markdown("**Conversor Rápido Precio Neto ↔ Precio Bruto con IVA (19%)**")
+        st.markdown("**Conversor Rápido Precio Neto / Precio Bruto con IVA (19%)**")
         col_c1, col_c2 = st.columns(2)
         with col_c1:
             monto_conv = st.number_input("Ingresa monto a convertir ($):", min_value=0, value=1190000, step=10000)
@@ -298,18 +330,18 @@ elif modulo_trib.startswith("3."):
             {"Etapa": "Formulario 29", "Pregunta de Control": "¿Cuadra RCV con libro mayor contable y F29?", "Evidencia": "F29, RCV, balance y mayor contable", "Riesgo": "Observaciones SII y rectificatorias"},
         ])
         st.dataframe(df_aud_iva, use_container_width=True, hide_index=True)
-        st.info("📅 **Plazos Generales F29:** Hasta el **día 12** del mes siguiente (regla general), **día 20** (declaración y pago electrónico por Internet para emisores de DTE según requisitos SII) y **día 28** (declaraciones sin movimiento / sin pago por Internet).")
+        st.info("**Plazos Generales F29:** Hasta el **día 12** del mes siguiente (regla general), **día 20** (declaración y pago electrónico por Internet para emisores de DTE según requisitos SII) y **día 28** (declaraciones sin movimiento / sin pago por Internet).")
 
 # ==============================================================================
 # MÓDULO 4: ANALÍTICA PGCT 2026: FISCALIZACIÓN, BRECHAS Y RIESGO SII
 # ==============================================================================
 elif modulo_trib.startswith("4."):
-    st.header("4. Plan de Gestión de Cumplimiento Tributario (PGCT 2026 - Ley N° 21.713)")
+    st.markdown("<div class='sec-header'>4. PLAN DE GESTIÓN DE CUMPLIMIENTO TRIBUTARIO (PGCT 2026 - LEY N° 21.713)</div>", unsafe_allow_html=True)
 
     pg1, pg2, pg3 = st.tabs([
-        "📊 Fiscalización y Recaudación por Segmento",
-        "🌎 Brechas de Evasión IVA y Control de Fraude",
-        "👥 Capacidades SII, Dotación y Formación PFI 2026",
+        "I. Fiscalización y Recaudación por Segmento",
+        "II. Brechas de Evasión IVA y Control de Fraude",
+        "III. Capacidades SII, Dotación y Formación PFI 2026",
     ])
 
     with pg1:
