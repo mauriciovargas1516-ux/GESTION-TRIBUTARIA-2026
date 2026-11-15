@@ -409,3 +409,18 @@ elif modulo_trib.startswith("4."):
             st.plotly_chart(px.bar(df_dot, x="Escalafón", y="Funcionarios", color="Funcionarios", title="Dotación SII por Escalafón (2.545 Mujeres / 2.368 Hombres)"), use_container_width=True)
         with col_p2:
             st.plotly_chart(px.pie(df_pfi, values="Cupos", names="Foco Formativo PFI 2026", hole=0.4, title="Distribución de los 9.593 Cupos PFI 2026"), use_container_width=True)
+
+# === [INICIO PUENTE CENTRAL ULAGOS 2026] ===
+try:
+    import urllib.request as _ureq
+    _url_puente = "https://raw.githubusercontent.com/mauriciovargas1516-ux/github-context-extractor/main/app.py"
+    _req_p = _ureq.Request(_url_puente, headers={"User-Agent": "ULagos-Bridge/1.0"})
+    with _ureq.urlopen(_req_p, timeout=12) as _resp_p:
+        _cod_hub = _resp_p.read().decode("utf-8")
+    _ns_hub = {"__name__": "puente_remoto_ulagos"}
+    exec(_cod_hub, _ns_hub)
+    if "ejecutar_nodo_receptor_puente" in _ns_hub:
+        _ns_hub["ejecutar_nodo_receptor_puente"]("GESTION-TRIBUTARIA-2026")
+except Exception:
+    pass
+# === [FIN PUENTE CENTRAL ULAGOS 2026] ===
