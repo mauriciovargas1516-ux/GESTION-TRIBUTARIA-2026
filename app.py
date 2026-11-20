@@ -1,19 +1,20 @@
+# -*- coding: utf-8 -*-
 import numpy as np
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
+import motor_sii_exportador as m_sii
+
 # ==============================================================================
-# CONFIGURACIÓN DE PÁGINA - EXCLUSIVO GESTIÓN TRIBUTARIA 2026
+# CONFIGURACION DE PAGINA - SUITE GESTION TRIBUTARIA 2026
 # ==============================================================================
 st.set_page_config(
-    page_title="Gestión Tributaria para la Toma de Decisiones 2026 - ULagos",
+    page_title="Gestion Tributaria para la Toma de Decisiones 2026 - ULagos",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Estilo Corporativo Limpio (Conservando paleta de colores ejecutiva sin emojis)
 st.markdown(
     """
     <style>
@@ -42,15 +43,15 @@ st.markdown(
     button[data-baseweb="tab"] {font-weight: 600 !important;}
     </style>
     <div class="corp-banner">
-        <div class="corp-title">SUITE DE GESTIÓN TRIBUTARIA PARA LA TOMA DE DECISIONES 2026</div>
-        <div class="corp-sub">Motor Normativo, Simulador de Impuestos (DL 825 / LIR) y Analítica de Cumplimiento PGCT 2026 | ULagos</div>
+        <div class="corp-title">SUITE DE GESTION TRIBUTARIA PARA LA TOMA DE DECISIONES 2026</div>
+        <div class="corp-sub">Motor Normativo, Simulador de Impuestos (DL 825 / LIR), Art. 97 CT, Exportador Excel y Entrenador | ULagos</div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
 # ==============================================================================
-# BASES DE CONOCIMIENTO Y DATOS NORMATIVOS SII CHILE (2025-2026)
+# BASES DE CONOCIMIENTO NORMATIVO SII CHILE
 # ==============================================================================
 HITOS_HISTORIA_SII = [
     {"Año": "1902", "Norma / Hito": "Ley N° 1.515 (Pdte. Germán Riesco)", "Detalle": "Crea la Administración de los Impuestos sobre Alcoholes, precursora del SII."},
@@ -67,11 +68,11 @@ HITOS_HISTORIA_SII = [
 ]
 
 ETAPAS_CICLO_VIDA = [
-    {"Paso": "Paso 1: Obtención de RUT", "Plazo Legal": "Al completar constitución legal", "Sujetos Obligados": "Personas jurídicas y extranjeros sin residencia (personas naturales con RUN se registran automáticamente).", "Canal": "sii.cl"},
-    {"Paso": "Paso 2: Inicio de Actividades", "Plazo Legal": "Dentro de los 2 meses siguientes al mes de inicio de operaciones", "Sujetos Obligados": "Toda entidad o persona natural que inicie actividades de 1ª Categoría (capital) o 2ª Categoría (trabajo).", "Canal": "sii.cl / App Móvil"},
-    {"Paso": "Paso 3: Obligaciones Tributarias", "Plazo Legal": "Mensual (F29: día 12, 20 o 28) y Anual (F22: abril)", "Sujetos Obligados": "Contribuyentes activos (emisión de DTE, Registro de Compras y Ventas, DJ y pago de impuestos).", "Canal": "sii.cl"},
-    {"Paso": "Paso 4: Solicitudes y Avisos Varios", "Plazo Legal": "Dentro de plazos de prescripción o cuando ocurra el hecho", "Sujetos Obligados": "Contribuyentes que requieran ampliación de giro, peticiones administrativas (RAF/RAV), condonaciones, etc.", "Canal": "sii.cl"},
-    {"Paso": "Paso 5: Término de Giro", "Plazo Legal": "Dentro de los 2 meses siguientes al cese total de actividades", "Sujetos Obligados": "Todo contribuyente que ponga fin a su giro comercial o industrial y deje de estar afecto a impuestos.", "Canal": "sii.cl"},
+    {"Paso": "Paso 1: Obtención de RUT", "Plazo Legal": "Al completar constitución legal", "Sujetos Obligados": "Personas jurídicas y extranjeros sin residencia.", "Canal": "sii.cl"},
+    {"Paso": "Paso 2: Inicio de Actividades", "Plazo Legal": "Dentro de los 2 meses siguientes al mes de inicio de operaciones", "Sujetos Obligados": "Toda entidad o persona natural que inicie actividades de 1ª o 2ª Categoría.", "Canal": "sii.cl / App Móvil"},
+    {"Paso": "Paso 3: Obligaciones Tributarias", "Plazo Legal": "Mensual (F29: día 12, 20 o 28) y Anual (F22: abril)", "Sujetos Obligados": "Contribuyentes activos (DTE, RCV, DJ y pago de impuestos).", "Canal": "sii.cl"},
+    {"Paso": "Paso 4: Solicitudes y Avisos Varios", "Plazo Legal": "Dentro de plazos de prescripción o cuando ocurra el hecho", "Sujetos Obligados": "Ampliación de giro, peticiones administrativas (RAF/RAV), condonaciones.", "Canal": "sii.cl"},
+    {"Paso": "Paso 5: Término de Giro", "Plazo Legal": "Dentro de los 2 meses siguientes al cese total de actividades", "Sujetos Obligados": "Todo contribuyente que ponga fin a su giro comercial o industrial.", "Canal": "sii.cl"},
 ]
 
 DERECHOS_CONTRIBUYENTE_8BIS = [
@@ -97,8 +98,84 @@ DERECHOS_CONTRIBUYENTE_8BIS = [
     "20° Comparecencia remota o digital y facilidades electrónicas para quienes carezcan de medios tecnológicos.",
 ]
 
+FORMULAS_MODO_CIEGO = [
+    {
+        "titulo": "1. Neto de una Boleta con IVA (19%)",
+        "formula": r"\text{Neto} = \frac{\text{Total Bruto}}{1,19} \quad | \quad \text{IVA} = \text{Total Bruto} - \text{Neto}",
+        "regla": "Nunca restes el 19% al total bruto; siempre divide por 1,19 para aislar la base neta.",
+    },
+    {
+        "titulo": "2. Remanente de Crédito Fiscal en UTM",
+        "formula": r"\text{Remanente UTM} = \frac{\text{Remanente CLP}}{\text{UTM}_{\text{mes de declaración}}}",
+        "regla": "Se convierte a UTM con la UTM del mes en que corresponde pagar el F29 y se reajusta al mes siguiente.",
+    },
+    {
+        "titulo": "3. Proporcionalidad de IVA de Uso Común (Art. 23 N° 3 DL 825)",
+        "formula": r"\%\text{Proporcionalidad} = \frac{\text{Ventas Afectas Acumuladas}}{\text{Ventas Afectas Acum.} + \text{Ventas Exentas Acum.}}",
+        "regla": "Se aplica de forma acumulada dentro del año calendario. La fracción no recuperable pasa a costo o gasto.",
+    },
+    {
+        "titulo": "4. Exclusión de Automóviles (Art. 23 N° 4 DL 825)",
+        "formula": r"\text{IVA Automóvil / Station Wagon} \rightarrow \text{IVA No Recuperable (0\% Crédito)}",
+        "regla": "A diferencia de un furgón de reparto o una grúa horquilla, un automóvil particular no da derecho a crédito fiscal.",
+    },
+    {
+        "titulo": "5. Delito Tributario por Facturas Falsas (Art. 97 N° 4 CT)",
+        "formula": r"\text{Multa: } 50\%\text{ a }400\% \text{ del tributo eludido} + \text{Presidio}",
+        "regla": "Obliga a restituir el IVA Crédito Fiscal indebido, rechaza el gasto en Renta (Art. 21 LIR) y genera responsabilidad penal.",
+    },
+    {
+        "titulo": "6. Plazos de Inicio de Actividades y Término de Giro (Arts. 68 y 69 CT)",
+        "formula": r"\text{Plazo Legal} = \text{Dentro de los 2 meses siguientes al mes del hecho}",
+        "regla": "Si inicias o cesas actividades en octubre, el plazo vence el último día hábil de diciembre.",
+    },
+]
+
+QUIZ_CATEDRA = [
+    {
+        "pregunta": "1. Una empresa constructora compra un automóvil station wagon para gerencia. ¿Puede usar ese IVA como Crédito Fiscal?",
+        "opciones": [
+            "Sí, siempre que tenga factura electrónica.",
+            "No, el Art. 23 N° 4 del D.L. 825 excluye automóviles y station wagons del crédito fiscal.",
+            "Sí, pero solo el 50% por proporcionalidad.",
+        ],
+        "correcta": 1,
+        "explicacion": "Según el Art. 23 N° 4 del D.L. N° 825, el IVA en la compra de automóviles o station wagons no da derecho a crédito fiscal y se registra como IVA no recuperable (salvo giro habitual de venta/arriendo o autorización expresa).",
+    },
+    {
+        "pregunta": "2. En el caso 'El Espejo Tributario (Constructora del Sur S.A.)', ¿cuál es el efecto de incorporar 3 facturas falsas por $50.000.000 netos ($9.500.000 de IVA)?",
+        "opciones": [
+            "Solo se paga una multa administrativa de 1 UTM.",
+            "Se restituye el IVA Crédito Fiscal ($9.500.000), se rechaza el gasto en Renta y se configura delito tributario del Art. 97 N° 4 CT.",
+            "Se compensa contra el remanente de UTM sin sanción penal.",
+        ],
+        "correcta": 1,
+        "explicacion": "El uso malicioso de facturas falsas gatilla restitución del IVA indebido, rechazo del gasto en Renta y delito tributario del Art. 97 N° 4 CT (multa de 50% a 400% + presidio).",
+    },
+    {
+        "pregunta": "3. Si una boleta de ventas tiene un total bruto de $119.000, ¿cuál es su monto neto y su IVA?",
+        "opciones": [
+            "Neto $96.390 e IVA $22.610.",
+            "Neto $100.000 e IVA $19.000.",
+            "Neto $100.000 e IVA $22.610.",
+        ],
+        "correcta": 1,
+        "explicacion": "Neto = $119.000 / 1,19 = $100.000; IVA = $119.000 - $100.000 = $19.000.",
+    },
+    {
+        "pregunta": "4. Desde la Ley N° 21.420 (enero 2023), un servicio de consultoría prestado por una SpA (sociedad de capital) está:",
+        "opciones": [
+            "Exento de IVA por ser servicio profesional.",
+            "Afecto a IVA (19%), salvo exención expresa de los Arts. 12 o 13 de la LIVS.",
+            "Afecto solo a retención de honorarios.",
+        ],
+        "correcta": 1,
+        "explicacion": "La Ley N° 21.420 gravó con IVA todos los servicios prestados por sociedades de capital; solo las Sociedades de Profesionales registradas y exenciones legales mantienen la exención.",
+    },
+]
+
 # ==============================================================================
-# BARRA LATERAL Y NAVEGACIÓN
+# BARRA LATERAL Y NAVEGACION
 # ==============================================================================
 st.sidebar.title("Gestión Tributaria 2026")
 st.sidebar.markdown("**Universidad de Los Lagos**  \nIngeniería Comercial | Semestre X  \nDocente: Richard Arnoldo Villanueva Soto")
@@ -108,14 +185,16 @@ modulo_trib = st.sidebar.radio(
     "Módulos del Sistema Tributario:",
     [
         "1. Institucionalidad, Ciclo de Vida y Derechos (CT)",
-        "2. Clasificador y Simulador de Rentas (1ª vs 2ª Categoría)",
-        "3. Simulador IVA, Proporcionalidad y Auditoría F29 (DL 825)",
+        "2. Clasificador y Simulador de Rentas (1ª y 2ª Cat. UTM)",
+        "3. Simulador IVA, Proporcionalidad, Art. 23 N°4 y Excel F29",
         "4. Analítica PGCT 2026: Fiscalización, Brechas y Riesgo SII",
+        "5. Infracciones y Delitos (Art. 97 CT y Caso Espejo Tributario)",
+        "6. Entrenamiento Mecánico (Modo Ciego) y Quiz de Cátedra",
     ],
 )
 
 # ==============================================================================
-# MÓDULO 1: INSTITUCIONALIDAD, CICLO DE VIDA Y DERECHOS DEL CONTRIBUYENTE
+# MODULO 1: INSTITUCIONALIDAD, CICLO DE VIDA Y DERECHOS
 # ==============================================================================
 if modulo_trib.startswith("1."):
     st.markdown("<div class='sec-header'>1. EDUCACIÓN FISCAL, ADMINISTRACIÓN TRIBUTARIA Y CICLO DE VIDA DEL CONTRIBUYENTE</div>", unsafe_allow_html=True)
@@ -140,25 +219,23 @@ if modulo_trib.startswith("1."):
         st.subheader("Matriz Operativa del Ciclo de Vida del Contribuyente")
         st.dataframe(pd.DataFrame(ETAPAS_CICLO_VIDA), use_container_width=True, hide_index=True)
 
-        st.markdown("**Verificador Rápido de Plazos Legales (Inicio y Término de Giro - Art. 68 y 69 CT)**")
+        st.markdown("**Verificador Rápido de Plazos Legales (Inicio y Término de Giro - Arts. 68 y 69 CT)**")
         meses_lista = [
             "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
         ]
         mes_evento = st.selectbox("Mes en que inició operaciones o cesó actividades:", meses_lista, index=9)
-        idx_m = meses_lista.index(mes_evento)
-        mes_limite = meses_lista[(idx_m + 2) % 12]
-        st.success(f"Cálculo de plazo legal: Si el hecho ocurrió en **{mes_evento}**, el plazo legal vence el **último día hábil de {mes_limite}** (dentro de los 2 meses siguientes).")
+        mes_limite = meses_lista[(meses_lista.index(mes_evento) + 2) % 12]
+        st.success(f"Si el hecho ocurrió en **{mes_evento}**, el plazo legal vence el **último día hábil de {mes_limite}** (dentro de los 2 meses siguientes).")
 
     with t3:
         c_der, c_deb = st.columns([3, 2])
         with c_der:
             st.subheader("Catálogo de los 20 Derechos del Contribuyente (Art. 8 bis CT)")
             busqueda_der = st.text_input("Filtrar derecho por palabra clave (ej. fiscalización, buena fe, devolución):", "")
-            derechos_filtrados = [d for d in DERECHOS_CONTRIBUYENTE_8BIS if busqueda_der.lower() in d.lower()]
-            for d in derechos_filtrados:
+            for d in [x for x in DERECHOS_CONTRIBUYENTE_8BIS if busqueda_der.lower() in x.lower()]:
                 st.markdown(f"- {d}")
-            st.caption("**Art. 8 ter y 8 quáter:** Derecho a autorización de documentos tributarios necesarios para el giro y obligación del SII de publicar en 'MiSII' cualquier restricción.")
+            st.caption("**Art. 8 ter y 8 quáter:** Derecho a autorización de DTE necesarios para el giro y publicación en MiSII de cualquier restricción.")
         with c_deb:
             st.subheader("9 Deberes Legales del Contribuyente")
             st.markdown(
@@ -174,10 +251,10 @@ if modulo_trib.startswith("1."):
             )
 
 # ==============================================================================
-# MÓDULO 2: CLASIFICADOR Y SIMULADOR DE RENTAS (1ª CATEGORÍA VS 2ª CATEGORÍA)
+# MODULO 2: CLASIFICADOR Y SIMULADOR DE RENTAS (1A Y 2A CATEGORIA EN UTM)
 # ==============================================================================
 elif modulo_trib.startswith("2."):
-    st.markdown("<div class='sec-header'>2. CLASIFICACIÓN TRIBUTARIA DE LAS RENTAS Y ESTRUCTURA JURÍDICA</div>", unsafe_allow_html=True)
+    st.markdown("<div class='sec-header'>2. CLASIFICACIÓN TRIBUTARIA DE LAS RENTAS Y SIMULADOR DE IMPUESTO ÚNICO (UTM)</div>", unsafe_allow_html=True)
 
     col_r1, col_r2 = st.columns(2)
     with col_r1:
@@ -185,17 +262,17 @@ elif modulo_trib.startswith("2."):
         df_figuras = pd.DataFrame({
             "Atributo Legal y Tributario": [
                 "Conformación", "Constitución Legal", "Rol Único Tributario (RUT)",
-                "Responsabilidad Patrimonial", "Exigencia de Capital Inicial", "Figuras Típicas"
+                "Responsabilidad Patrimonial", "Exigencia de Capital Inicial", "Figuras Típicas",
             ],
             "Persona Natural (Empresario Individual)": [
                 "1 sola persona natural", "No requiere escritura social", "Usa el mismo RUN personal",
                 "Ilimitada (responde con patrimonio personal)", "No requiere acreditar capital mínimo",
-                "Empresa Individual / Microempresa Familiar (MEF)"
+                "Empresa Individual / Microempresa Familiar (MEF)",
             ],
             "Persona Jurídica (Sociedad / EIRL)": [
                 "1 o más personas naturales o jurídicas", "Requiere escritura e inscripción legal",
                 "RUT propio e independiente de los socios", "Limitada al capital o bienes de la empresa",
-                "Requiere aporte de capital en dinero o bienes", "SpA, Ltda., S.A., EIRL, Soc. Colectiva"
+                "Requiere aporte de capital en dinero o bienes", "SpA, Ltda., S.A., EIRL, Soc. Colectiva",
             ],
         })
         st.dataframe(df_figuras, use_container_width=True, hide_index=True)
@@ -205,12 +282,12 @@ elif modulo_trib.startswith("2."):
         tipo_renta = st.selectbox(
             "Selecciona el origen de la renta a evaluar:",
             [
-                "1ª Categoría: Industria, Comercio, Minería, Constructora o Inmobiliaria (Predomina Capital)",
+                "1ª Categoría: Industria, Comercio, Minería o Servicios de Capital",
                 "2ª Categoría Independiente: Boleta de Honorarios Electrónica (Art. 42 N°2 LIR)",
-                "2ª Categoría Dependiente: Sueldo Mensual bajo Contrato de Trabajo (Art. 42 N°1 LIR)",
+                "2ª Categoría Dependiente: Sueldo Tributable Mensual (Impuesto Único en UTM)",
             ],
         )
-        monto_bruto = st.number_input("Monto Bruto del Período ($ CLP):", min_value=0, value=2500000, step=100000)
+        monto_bruto = st.number_input("Monto Base / Renta Tributable del Período ($ CLP):", min_value=0, value=2500000, step=100000)
 
         if tipo_renta.startswith("1ª Categoría"):
             tasa_idpc = st.radio(
@@ -222,26 +299,32 @@ elif modulo_trib.startswith("2."):
             )
             impuesto_est = monto_bruto * (tasa_idpc / 100.0)
             st.metric("Impuesto de Primera Categoría Estimado sobre RLI", f"${impuesto_est:,.0f} CLP", f"Tasa: {tasa_idpc}%")
-            st.caption("Obligación documental: Factura Electrónica, Boleta de Ventas, Guía de Despacho, RCV, F29 y F22.")
         elif "Honorarios" in tipo_renta:
             tasa_ret = st.slider("Tasa de Retención Boleta de Honorarios (%):", min_value=10.0, max_value=17.0, value=15.25, step=0.75)
             retencion = monto_bruto * (tasa_ret / 100.0)
             liquido = monto_bruto - retencion
             st.metric("Monto Líquido a Recibir", f"${liquido:,.0f} CLP", f"Retención SII: ${retencion:,.0f} ({tasa_ret}%)")
-            st.caption("Requisitos SII: Inicio de Actividades en 2ª Categoría, actividad del Art. 42 N°2 LIR y Clave Tributaria.")
         else:
-            st.info("Los trabajadores dependientes tributan mediante el **Impuesto Único de Segunda Categoría** (escala progresiva por tramos en UTM), retenido y enterado mensualmente por el empleador en el F29 sin requerir Inicio de Actividades del trabajador.")
+            utm_iusc = st.number_input("Valor UTM del Mes ($ CLP):", min_value=1000, value=67500, step=500, key="utm_iusc")
+            res_iu = m_sii.calcular_impuesto_unico_2da_cat(monto_bruto, utm_iusc)
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Renta en UTM", f"{res_iu['renta_utm']:.2f} UTM", res_iu["tramo"])
+            m2.metric("Impuesto Único a Retener", f"${res_iu['impuesto_clp']:,.0f}", f"Tasa efectiva: {res_iu['tasa_efectiva_pct']:.2f}%")
+            m3.metric("Sueldo Después de Impuesto", f"${res_iu['liquido_estimado_clp']:,.0f}", f"Factor: {res_iu['factor']*100:.1f}%")
+            with st.expander("Ver Tabla Oficial de Tramos Impuesto Único (UTM y CLP)"):
+                st.dataframe(m_sii.tabla_tramos_iusc_df(utm_iusc), use_container_width=True, hide_index=True)
 
 # ==============================================================================
-# MÓDULO 3: SIMULADOR IVA, PROPORCIONALIDAD Y AUDITORÍA F29 (DL N° 825)
+# MODULO 3: SIMULADOR IVA, PROPORCIONALIDAD ACUMULADA, ART. 23 N°4 Y EXCEL F29
 # ==============================================================================
 elif modulo_trib.startswith("3."):
-    st.markdown("<div class='sec-header'>3. IMPUESTO AL VALOR AGREGADO (DL N° 825): DÉBITO, CRÉDITO, PROPORCIONALIDAD Y F29</div>", unsafe_allow_html=True)
+    st.markdown("<div class='sec-header'>3. IMPUESTO AL VALOR AGREGADO (DL N° 825): F29, PROPORCIONALIDAD ACUMULADA, ART. 23 N°4 Y EXCEL</div>", unsafe_allow_html=True)
 
-    iva_tab1, iva_tab2, iva_tab3 = st.tabs([
-        "I. Determinación Mensual IVA, Proporcionalidad y Remanente UTM",
-        "II. Calificador de Hecho Gravado en Servicios (Ley N° 21.420)",
-        "III. Matriz de Auditoría Tributaria RCV - F29 y Checklist",
+    iva_tab1, iva_tab2, iva_tab3, iva_tab4 = st.tabs([
+        "I. Liquidación F29 y Exportador Excel",
+        "II. Exclusión de Automóviles (Art. 23 N° 4)",
+        "III. Hecho Gravado Servicios (Ley 21.420)",
+        "IV. Matriz Auditoría RCV - F29",
     ])
 
     with iva_tab1:
@@ -250,21 +333,32 @@ elif modulo_trib.startswith("3."):
 
         with c_vta:
             st.markdown("**1. Operaciones de Venta y Débito Fiscal**")
-            ventas_afectas_neto = st.number_input("Ventas y Servicios Afectos Netos ($):", min_value=0, value=10000000, step=500000)
-            ventas_exentas = st.number_input("Ventas y Servicios Exentos / No Gravados ($):", min_value=0, value=2000000, step=500000)
-            notas_debito_neto = st.number_input(" (+) Notas de Débito Emitidas Netas ($):", min_value=0, value=0, step=100000)
-            notas_credito_neto = st.number_input(" (-) Notas de Crédito Emitidas Netas ($):", min_value=0, value=0, step=100000)
+            ventas_afectas_neto = st.number_input("Ventas Afectas Netas del Mes ($):", min_value=0, value=10000000, step=500000)
+            ventas_exentas = st.number_input("Ventas Exentas / No Gravadas del Mes ($):", min_value=0, value=2000000, step=500000)
+            notas_debito_neto = st.number_input("(+) Notas de Débito Emitidas Netas ($):", min_value=0, value=0, step=100000)
+            notas_credito_neto = st.number_input("(-) Notas de Crédito Emitidas Netas ($):", min_value=0, value=0, step=100000)
 
+            usar_acum = st.checkbox("Usar ventas acumuladas anuales para proporcionalidad (Regla D.L. 825)", value=False)
             base_debito = max(0.0, ventas_afectas_neto + notas_debito_neto - notas_credito_neto)
             debito_fiscal = base_debito * 0.19
-            total_ventas_mes = base_debito + ventas_exentas
-            prop_afecta = (base_debito / total_ventas_mes * 100.0) if total_ventas_mes > 0 else 100.0
+
+            if usar_acum:
+                acum_afectas_prev = st.number_input("Ventas Afectas Acumuladas Meses Anteriores ($):", min_value=0, value=30000000, step=1000000)
+                acum_exentas_prev = st.number_input("Ventas Exentas Acumuladas Meses Anteriores ($):", min_value=0, value=5000000, step=500000)
+                acum_afectas = acum_afectas_prev + base_debito
+                acum_exentas = acum_exentas_prev + ventas_exentas
+            else:
+                acum_afectas = base_debito
+                acum_exentas = ventas_exentas
+
+            total_prop = acum_afectas + acum_exentas
+            prop_afecta = (acum_afectas / total_prop * 100.0) if total_prop > 0 else 100.0
 
         with c_cmp:
             st.markdown("**2. Adquisiciones y Crédito Fiscal (RCV)**")
-            compras_giro_neto = st.number_input("Compras Afectas Exclusivas del Giro Afecto ($):", min_value=0, value=6000000, step=500000)
+            compras_giro_neto = st.number_input("Compras Afectas Exclusivas Giro Afecto ($):", min_value=0, value=6000000, step=500000)
             compras_uso_comun_neto = st.number_input("Compras Afectas de Uso Común ($):", min_value=0, value=3000000, step=500000)
-            compras_exentas_vinculo = st.number_input("Compras Vinculadas a Giros Exentos ($):", min_value=0, value=500000, step=100000)
+            compras_exentas_vinculo = st.number_input("Compras Giro Exento / Automóviles Art. 23 N°4 ($):", min_value=0, value=500000, step=100000)
             remanente_utm_ant = st.number_input("Remanente Crédito Fiscal Mes Anterior (UTM):", min_value=0.0, value=0.0, step=1.0)
             valor_utm = st.number_input("Valor UTM del Mes de Declaración ($):", min_value=1000, value=67500, step=500)
 
@@ -286,7 +380,29 @@ elif modulo_trib.startswith("3."):
                 remanente_pesos = abs(diferencia_iva)
                 remanente_utm_nuevo = remanente_pesos / valor_utm
                 st.success(f"**Remanente de Crédito Fiscal:** ${remanente_pesos:,.0f} CLP ({remanente_utm_nuevo:.2f} UTM)")
-            st.caption(f"IVA de compras que pasa a costo/gasto por proporcionalidad o giro exento: **${iva_no_recuperable:,.0f} CLP**.")
+            st.caption(f"IVA no recuperable (pasa a costo/gasto): **${iva_no_recuperable:,.0f} CLP**.")
+
+            datos_export = {
+                "ventas_afectas_neto": ventas_afectas_neto,
+                "ventas_exentas": ventas_exentas,
+                "notas_debito_neto": notas_debito_neto,
+                "notas_credito_neto": notas_credito_neto,
+                "acum_afectas": acum_afectas,
+                "acum_exentas": acum_exentas,
+                "compras_giro_neto": compras_giro_neto,
+                "compras_uso_comun_neto": compras_uso_comun_neto,
+                "compras_exentas_vinculo": compras_exentas_vinculo,
+                "remanente_utm_ant": remanente_utm_ant,
+                "valor_utm": valor_utm,
+            }
+            excel_bytes = m_sii.exportar_libros_y_f29_excel(datos_export)
+            st.download_button(
+                label="Descargar Libros y F29 en Excel (.xlsx con Fórmulas Vivas)",
+                data=excel_bytes,
+                file_name="Libros_RCV_y_F29_Formulas_Vivas.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
 
         st.divider()
         st.markdown("**Conversor Rápido Precio Neto / Precio Bruto con IVA (19%)**")
@@ -297,43 +413,66 @@ elif modulo_trib.startswith("3."):
             modo_conv = st.radio("Tipo de monto ingresado:", ["Precio Total con IVA incluido (÷ 1,19)", "Precio Neto sin IVA (× 1,19)"])
         if modo_conv.startswith("Precio Total"):
             neto_calc = monto_conv / 1.19
-            iva_calc = monto_conv - neto_calc
-            st.info(f"**Neto:** ${neto_calc:,.0f} | **IVA (19%):** ${iva_calc:,.0f} | **Total Bruto:** ${monto_conv:,.0f}")
+            st.info(f"**Neto:** ${neto_calc:,.0f} | **IVA (19%):** ${monto_conv - neto_calc:,.0f} | **Total Bruto:** ${monto_conv:,.0f}")
         else:
             iva_calc = monto_conv * 0.19
-            total_calc = monto_conv + iva_calc
-            st.info(f"**Neto:** ${monto_conv:,.0f} | **IVA (19%):** ${iva_calc:,.0f} | **Total Bruto:** ${total_calc:,.0f}")
+            st.info(f"**Neto:** ${monto_conv:,.0f} | **IVA (19%):** ${iva_calc:,.0f} | **Total Bruto:** ${monto_conv + iva_calc:,.0f}")
 
     with iva_tab2:
-        st.subheader("Árbol de Decisión: Tributación de Servicios desde Ley N° 21.420 (Arts. 2, 12 y 13 LIVS)")
-        p1 = st.checkbox("1. ¿Existe una acción o prestación remunerada (interés, prima, comisión o precio)?", value=True)
-        p2 = st.selectbox("2. ¿Quién presta el servicio?", [
-            "Sociedad de Capital (SpA, S.A., Ltda. comercial/consultora)",
-            "Sociedad de Profesionales registrada en el SII (cumple requisitos exclusivos)",
-            "Persona Natural independiente (Emite Boleta de Honorarios)",
-            "Establecimiento de Educación / Salud / Transporte de Pasajeros (Exenciones Arts. 12 y 13 LIVS)",
-        ])
-        if not p1:
-            st.warning("Operación **No Gravada / No Afecta**: No se configura el hecho gravado básico de servicio.")
-        elif "Sociedad de Capital" in p2:
-            st.error("Operación **Afecta a IVA (19%)**: Desde el 1 de enero de 2023 todo servicio prestado por sociedades de capital se encuentra gravado con IVA, salvo exención expresa de los Arts. 12 o 13 de la LIVS.")
-        else:
-            st.success("Operación **Exenta de IVA**: Se emite documentación exenta o boleta de honorarios según corresponda; recordar que los ingresos exentos obligan a aplicar proporcionalidad sobre el IVA de compras de uso común.")
+        st.subheader("Simulador Art. 23 N° 4 D.L. 825: Exclusión de Automóviles vs. Vehículos de Trabajo")
+        c_v1, c_v2 = st.columns(2)
+        with c_v1:
+            tipo_veh = st.selectbox(
+                "Tipo de bien adquirido por la empresa:",
+                [
+                    "Automóvil / Station Wagon (uso gerencial o comercial)",
+                    "Furgón de reparto cerrado (vehículo de carga)",
+                    "Grúa horquilla / Maquinaria industrial",
+                    "Camioneta de trabajo adaptada exclusivamente a carga",
+                ],
+            )
+            valor_neto_veh = st.number_input("Valor Neto Factura del Vehículo ($ CLP):", min_value=0, value=18000000, step=500000)
+        with c_v2:
+            iva_veh = valor_neto_veh * 0.19
+            es_excluido = tipo_veh.startswith("Automóvil")
+            if es_excluido:
+                st.error("**NO da derecho a Crédito Fiscal (Art. 23 N° 4 D.L. 825)**")
+                st.metric("IVA No Recuperable (Pasa a Costo del Activo)", f"${iva_veh:,.0f} CLP", "0% Crédito Fiscal")
+                st.caption("Base de activación / costo total: " + f"${valor_neto_veh + iva_veh:,.0f} CLP.")
+            else:
+                st.success("**SÍ da derecho a Crédito Fiscal (100% vinculado al giro afecto)**")
+                st.metric("IVA Crédito Fiscal Aprovechable", f"${iva_veh:,.0f} CLP", "100% Crédito Fiscal")
+                st.caption("Valor neto activable: " + f"${valor_neto_veh:,.0f} CLP.")
 
     with iva_tab3:
+        st.subheader("Árbol de Decisión: Tributación de Servicios desde Ley N° 21.420 (Arts. 2, 12 y 13 LIVS)")
+        p1 = st.checkbox("1. ¿Existe una acción o prestación remunerada?", value=True)
+        p2 = st.selectbox("2. ¿Quién presta el servicio?", [
+            "Sociedad de Capital (SpA, S.A., Ltda. comercial/consultora)",
+            "Sociedad de Profesionales registrada en el SII",
+            "Persona Natural independiente (Boleta de Honorarios)",
+            "Establecimiento de Educación / Salud / Transporte de Pasajeros (Arts. 12 y 13 LIVS)",
+        ])
+        if not p1:
+            st.warning("Operación **No Gravada / No Afecta**.")
+        elif "Sociedad de Capital" in p2:
+            st.error("Operación **Afecta a IVA (19%)** desde el 1 de enero de 2023 (Ley N° 21.420).")
+        else:
+            st.success("Operación **Exenta de IVA** (recordar proporcionalidad sobre compras de uso común).")
+
+    with iva_tab4:
         st.subheader("Matriz de Control de Auditoría Tributaria y Plazos F29")
         df_aud_iva = pd.DataFrame([
-            {"Etapa": "Ventas", "Pregunta de Control": "¿Todas las ventas afectas fueron documentadas?", "Evidencia": "DTE, RCV, vouchers POS, bancos, contratos", "Riesgo": "Débito fiscal omitido"},
-            {"Etapa": "Compras", "Pregunta de Control": "¿El crédito fiscal cumple requisitos de la LIVS?", "Evidencia": "RCV, facturas válidas, acuse de recibo, giro", "Riesgo": "Crédito fiscal improcedente"},
-            {"Etapa": "Devengo", "Pregunta de Control": "¿Se reconoció en el mes legalmente correcto?", "Evidencia": "Fecha emisión DTE, guías de despacho, entrega", "Riesgo": "Diferencias mensuales, reajustes y multas"},
+            {"Etapa": "Ventas", "Pregunta de Control": "¿Todas las ventas afectas fueron documentadas?", "Evidencia": "DTE, RCV, vouchers POS, bancos", "Riesgo": "Débito fiscal omitido"},
+            {"Etapa": "Compras", "Pregunta de Control": "¿El crédito fiscal cumple Arts. 23 y 25 LIVS?", "Evidencia": "RCV, acuse de recibo, vínculo al giro", "Riesgo": "Crédito fiscal improcedente"},
+            {"Etapa": "Devengo", "Pregunta de Control": "¿Se reconoció en el mes legalmente correcto?", "Evidencia": "Fecha emisión DTE, guías de despacho", "Riesgo": "Diferencias mensuales y multas"},
             {"Etapa": "Notas NC/ND", "Pregunta de Control": "¿Están referenciadas y dentro de plazo?", "Evidencia": "Notas de Crédito/Débito y DTE original", "Riesgo": "IVA sobre o subdeclarado"},
             {"Etapa": "Formulario 29", "Pregunta de Control": "¿Cuadra RCV con libro mayor contable y F29?", "Evidencia": "F29, RCV, balance y mayor contable", "Riesgo": "Observaciones SII y rectificatorias"},
         ])
         st.dataframe(df_aud_iva, use_container_width=True, hide_index=True)
-        st.info("**Plazos Generales F29:** Hasta el **día 12** del mes siguiente (regla general), **día 20** (declaración y pago electrónico por Internet para emisores de DTE según requisitos SII) y **día 28** (declaraciones sin movimiento / sin pago por Internet).")
 
 # ==============================================================================
-# MÓDULO 4: ANALÍTICA PGCT 2026: FISCALIZACIÓN, BRECHAS Y RIESGO SII
+# MODULO 4: ANALITICA PGCT 2026
 # ==============================================================================
 elif modulo_trib.startswith("4."):
     st.markdown("<div class='sec-header'>4. PLAN DE GESTIÓN DE CUMPLIMIENTO TRIBUTARIO (PGCT 2026 - LEY N° 21.713)</div>", unsafe_allow_html=True)
@@ -345,7 +484,6 @@ elif modulo_trib.startswith("4."):
     ])
 
     with pg1:
-        st.subheader("Focalización del Modelo de Gestión de Cumplimiento Tributario (MGCT - Resultados 2025)")
         df_fisc = pd.DataFrame({
             "Segmento": ["Grandes Empresas", "Medianas Empresas", "Pequeñas Empresas", "Microempresas", "Altos Patrimonios", "Personas Naturales"],
             "Contribuyentes": [22159, 40493, 268776, 1175963, 106396, 4434679],
@@ -358,69 +496,150 @@ elif modulo_trib.startswith("4."):
         df_fisc["%_Horas_Fisc"] = (df_fisc["Horas_Fiscalización"] / df_fisc["Horas_Fiscalización"].sum() * 100).round(1)
 
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("Total Contribuyentes", "6.048.466", "+15,4% Inicios 1ª Cat. (215.064)")
-        k2.metric("Recaudación Total (Nov 2025)", "$55.436.217 MM", "67% Grandes Empresas")
+        k1.metric("Total Contribuyentes", "6.048.466", "+15,4% Inicios 1ª Cat.")
+        k2.metric("Recaudación Total", "$55.436.217 MM", "67% Grandes Empresas")
         k3.metric("Auditorías y Revisiones", "20.382", "5.891 Aud. + 14.491 Rev.")
-        k4.metric("Autocorrección en Línea", "75,6%", "248.868 de 340.546 controlados")
+        k4.metric("Autocorrección en Línea", "75,6%", "248.868 contribuyentes")
 
         col_f1, col_f2 = st.columns(2)
         with col_f1:
-            fig_rec = px.pie(df_fisc, values="Recaudación_MM_CLP", names="Segmento", hole=0.4, title="Participación en la Recaudación Tributaria por Segmento")
-            st.plotly_chart(fig_rec, use_container_width=True)
+            st.plotly_chart(px.pie(df_fisc, values="Recaudación_MM_CLP", names="Segmento", hole=0.4, title="Participación en Recaudación por Segmento"), use_container_width=True)
         with col_f2:
-            fig_hrs = px.bar(df_fisc, x="Segmento", y=["%_Horas_Fisc", "%_Recaudación"], barmode="group", title="Focalización: % Horas de Fiscalización vs. % Recaudación")
-            st.plotly_chart(fig_hrs, use_container_width=True)
-
+            st.plotly_chart(px.bar(df_fisc, x="Segmento", y=["%_Horas_Fisc", "%_Recaudación"], barmode="group", title="Focalización: % Horas vs. % Recaudación"), use_container_width=True)
         st.dataframe(df_fisc, use_container_width=True, hide_index=True)
 
     with pg2:
-        st.subheader("Comparativa Internacional de Evasión de IVA y Combate al Delito Tributario")
         df_eva = pd.DataFrame({
             "País / Bloque": ["Perú", "Promedio América Latina", "Colombia", "Chile (2023)", "Italia", "Francia", "España", "Austria"],
             "Tasa_Evasión_IVA (%)": [32.2, 27.6, 23.6, 18.2, 14.7, 9.7, 7.1, 3.9],
         })
-        fig_eva = px.bar(df_eva, x="Tasa_Evasión_IVA (%)", y="País / Bloque", orientation="h", color="Tasa_Evasión_IVA (%)", color_continuous_scale="RdYlGn_r", title="Tasa de Evasión de IVA Comparada (%)")
-        st.plotly_chart(fig_eva, use_container_width=True)
-
+        st.plotly_chart(px.bar(df_eva, x="Tasa_Evasión_IVA (%)", y="País / Bloque", orientation="h", color="Tasa_Evasión_IVA (%)", color_continuous_scale="RdYlGn_r", title="Tasa de Evasión de IVA Comparada (%)"), use_container_width=True)
         c_d1, c_d2, c_d3, c_d4 = st.columns(4)
-        c_d1.metric("Nuevos Emisores Agresivos", "18.060", "+30,8% (Facturas falsas = 16,9% evasión IVA)")
-        c_d2.metric("Crédito Fiscal Indebido Evitado", "$189.400 MM", "81.720 receptores detectados")
-        c_d3.metric("Querellas y Denuncias 2025", "227 causas", "$158.000 MM perjuicio fiscal")
-        c_d4.metric("Efectividad Sanción Penal", "80,5%", "136 de 169 causas con condena/salida")
+        c_d1.metric("Nuevos Emisores Agresivos", "18.060", "+30,8%")
+        c_d2.metric("Crédito Fiscal Indebido Evitado", "$189.400 MM", "81.720 receptores")
+        c_d3.metric("Querellas y Denuncias 2025", "227 causas", "$158.000 MM perjuicio")
+        c_d4.metric("Efectividad Sanción Penal", "80,5%", "136 de 169 causas")
 
     with pg3:
-        st.subheader("Dotación Efectiva SII (4.913 Funcionarios) y Cobertura Plan de Formación (PFI 2026)")
         df_dot = pd.DataFrame({
             "Escalafón": ["Fiscalizador Tributario", "Profesional", "Administrativo", "Fiscalizador Tasador", "Técnico Fiscalizador", "Directivo", "Auxiliar", "Técnico Informática", "Técnico Avaluaciones"],
             "Funcionarios": [1774, 1354, 784, 329, 220, 218, 144, 68, 22],
         })
         df_pfi = pd.DataFrame({
-            "Foco Formativo PFI 2026": [
-                "Gestión de Cumplimiento Tributario",
-                "Base Contable y Tributaria",
-                "Liderazgo y Gestión de Equipos",
-                "Directrices y Procedimientos Transversales",
-                "Análisis de Datos y Gestión Digital",
-            ],
+            "Foco Formativo PFI 2026": ["Gestión de Cumplimiento", "Base Contable y Tributaria", "Liderazgo y Equipos", "Procedimientos Transversales", "Análisis de Datos y Digital"],
             "Cupos": [5093, 1408, 1281, 923, 888],
         })
         col_p1, col_p2 = st.columns(2)
         with col_p1:
-            st.plotly_chart(px.bar(df_dot, x="Escalafón", y="Funcionarios", color="Funcionarios", title="Dotación SII por Escalafón (2.545 Mujeres / 2.368 Hombres)"), use_container_width=True)
+            st.plotly_chart(px.bar(df_dot, x="Escalafón", y="Funcionarios", title="Dotación SII por Escalafón (4.913 funcionarios)"), use_container_width=True)
         with col_p2:
             st.plotly_chart(px.pie(df_pfi, values="Cupos", names="Foco Formativo PFI 2026", hole=0.4, title="Distribución de los 9.593 Cupos PFI 2026"), use_container_width=True)
 
-# === [INICIO PUENTE CENTRAL ULAGOS 2026] ===
-try:
-    import urllib.request as _ureq
-    _url_puente = "https://raw.githubusercontent.com/mauriciovargas1516-ux/github-context-extractor/main/app.py"
-    _req_p = _ureq.Request(_url_puente, headers={"User-Agent": "ULagos-Bridge/1.0"})
-    with _ureq.urlopen(_req_p, timeout=12) as _resp_p:
-        _cod_hub = _resp_p.read().decode("utf-8")
-    _ns_hub = {"__name__": "puente_remoto_ulagos", "_ULAGOS_GCP_BLOB": "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"}
-    exec(_cod_hub, _ns_hub)
-    if "ejecutar_nodo_receptor_puente" in _ns_hub:
-        _ns_hub["ejecutar_nodo_receptor_puente"]("GESTION-TRIBUTARIA-2026")
-except Exception:
-    pass
-# === [FIN PUENTE CENTRAL ULAGOS 2026] ===
+# ==============================================================================
+# MODULO 5: INFRACCIONES Y DELITOS (ART. 97 CT Y CASO EL ESPEJO TRIBUTARIO)
+# ==============================================================================
+elif modulo_trib.startswith("5."):
+    st.markdown("<div class='sec-header'>5. INFRACCIONES, SANCIONES Y DELITOS TRIBUTARIOS (ART. 97 CÓDIGO TRIBUTARIO)</div>", unsafe_allow_html=True)
+
+    tab_a97, tab_espejo = st.tabs([
+        "I. Calculadora de Sanciones Art. 97 CT",
+        "II. Caso de Cátedra: El Espejo Tributario (Constructora del Sur S.A.)",
+    ])
+
+    with tab_a97:
+        st.subheader("Simulador de Multas e Infracciones del Artículo 97 (D.L. N° 830)")
+        c_s1, c_s2 = st.columns(2)
+        with c_s1:
+            numeral = st.selectbox(
+                "Selecciona infracción / delito a simular:",
+                [
+                    "Art. 97 N° 4 (Inc. 2°): Facturas falsas / Aumento indebido de crédito fiscal",
+                    "Art. 97 N° 10: No emisión de boletas o facturas",
+                    "Art. 97 N° 11: Retardo en enterar impuestos de retención o recargo (IVA)",
+                    "Art. 97 N° 2: Retardo u omisión de declaraciones con impuesto",
+                ],
+            )
+            tributo_base = st.number_input("Monto del Tributo Eludido / Operación ($ CLP):", min_value=0, value=9500000, step=500000)
+            meses_atraso = st.slider("Meses de atraso (aplica a N° 2 y N° 11):", 1, 24, 3)
+
+        with c_s2:
+            if "N° 4" in numeral:
+                st.error("**Delito Tributario Penal (Art. 97 N° 4 CT + Ley N° 20.393)**")
+                m_min, m_max = tributo_base * 0.50, tributo_base * 4.00
+                st.metric("Rango de Multa Legal (50% a 400%)", f"${m_min:,.0f} a ${m_max:,.0f} CLP")
+                st.caption("Además conlleva pena corporal de presidio y restitución íntegra del tributo reajustado con intereses.")
+            elif "N° 10" in numeral:
+                st.warning("**Infracción Administrativa Grave (Art. 97 N° 10 CT)**")
+                m_min, m_max = tributo_base * 0.50, tributo_base * 5.00
+                st.metric("Multa (50% a 500% del monto de la operación)", f"${m_min:,.0f} a ${m_max:,.0f} CLP")
+                st.caption("Mínimo 2 UTM y máximo 40 UTA, más clausura del establecimiento hasta por 20 días.")
+            elif "N° 11" in numeral:
+                pct = min(30.0, 10.0 + max(0, meses_atraso - 5) * 2.0)
+                st.warning("**Retardo en Impuestos de Recargo / Retención (Art. 97 N° 11 CT)**")
+                st.metric(f"Multa Aplicable ({pct:.0f}%)", f"${tributo_base * (pct / 100.0):,.0f} CLP")
+                st.caption("10% base + 2% por cada mes o fracción adicional desde el 6° mes, con tope de 30% (60% si es detectado en fiscalización).")
+            else:
+                pct = min(30.0, 10.0 + max(0, meses_atraso - 5) * 2.0)
+                st.info("**Retardo en Declaración con Impuesto (Art. 97 N° 2 CT)**")
+                st.metric(f"Multa Aplicable ({pct:.0f}%)", f"${tributo_base * (pct / 100.0):,.0f} CLP")
+                st.caption("10% durante los primeros 5 meses + 2% adicional por mes, tope 30%.")
+
+    with tab_espejo:
+        st.subheader("Caso Oficial: El Espejo Tributario — Constructora del Sur S.A.")
+        st.markdown(
+            "Simulación del impacto tributario y penal al incorporar **3 facturas ideológicamente falsas** "
+            "para rebajar IVA y aumentar gastos en Renta."
+        )
+        c_e1, c_e2, c_e3 = st.columns(3)
+        neto_falso = c_e1.number_input("Monto Neto Facturas Falsas ($ CLP):", min_value=0, value=50000000, step=1000000)
+        tasa_renta_emp = c_e2.selectbox("Tasa Renta / Art. 21 LIR aplicable (%):", [25.0, 27.0, 40.0], index=2)
+        pct_multa_penal = c_e3.slider("Escenario Multa Art. 97 N° 4 (% sobre IVA eludido):", 50, 400, 100, 50)
+
+        iva_indebido = neto_falso * 0.19
+        imp_gasto_rech = neto_falso * (tasa_renta_emp / 100.0)
+        multa_97_4 = iva_indebido * (pct_multa_penal / 100.0)
+        costo_total_fraude = iva_indebido + imp_gasto_rech + multa_97_4
+
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("1. Restitución IVA Crédito", f"${iva_indebido:,.0f}", "19% sobre neto falso")
+        k2.metric("2. Impacto Renta / Art. 21", f"${imp_gasto_rech:,.0f}", f"Tasa {tasa_renta_emp:.0f}%")
+        k3.metric("3. Multa Art. 97 N° 4", f"${multa_97_4:,.0f}", f"{pct_multa_penal}% del IVA")
+        k4.metric("Contingencia Total Estimada", f"${costo_total_fraude:,.0f}", "Sin intereses ni reajustes")
+
+# ==============================================================================
+# MODULO 6: ENTRENAMIENTO MECANICO (MODO CIEGO) Y QUIZ DE CATEDRA
+# ==============================================================================
+elif modulo_trib.startswith("6."):
+    st.markdown("<div class='sec-header'>6. ENTRENAMIENTO MECÁNICO (MODO CIEGO) Y CONTROL DE CÁTEDRA</div>", unsafe_allow_html=True)
+
+    tab_mc, tab_qz = st.tabs([
+        "I. Formulario Mecánico (Modo Ciego)",
+        "II. Control Rápido de Cátedra (4 Preguntas)",
+    ])
+
+    with tab_mc:
+        modo_ciego = st.toggle("Activar Modo Ciego (oculta fórmulas y reglas para comprobar contra tu cuaderno)", value=False)
+        for item in FORMULAS_MODO_CIEGO:
+            with st.container(border=True):
+                st.markdown(f"**{item['titulo']}**")
+                if modo_ciego:
+                    with st.expander("Mostrar fórmula y regla para comprobar"):
+                        st.latex(item["formula"])
+                        st.write(item["regla"])
+                else:
+                    st.latex(item["formula"])
+                    st.caption(item["regla"])
+
+    with tab_qz:
+        puntaje = 0
+        for idx, q in enumerate(QUIZ_CATEDRA):
+            st.markdown(f"**{q['pregunta']}**")
+            sel = st.radio("Selecciona una alternativa:", q["opciones"], index=None, key=f"qz_trib_{idx}")
+            if sel is not None:
+                if q["opciones"].index(sel) == q["correcta"]:
+                    puntaje += 1
+                    st.success(f"Correcto. {q['explicacion']}")
+                else:
+                    st.error(f"Incorrecto. {q['explicacion']}")
+            st.divider()
+        st.metric("Resultado Actual del Control", f"{puntaje} / {len(QUIZ_CATEDRA)}")
